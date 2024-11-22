@@ -1,5 +1,7 @@
 import heapq
-from collections import defaultdict, Counter
+from collections import Counter
+from bitarray import bitarray
+import json
 
 class Node:
     def __init__(self, char, freq):
@@ -8,31 +10,18 @@ class Node:
         self.left = None
         self.right = None
 
-    # Define comparison operators for priority queue
     def __lt__(self, other):
         return self.freq < other.freq
 
+
 def getFrequency(data):
-    # Returns the frequency of each character in the input string.
-    frequency = {}
-    for char in data:
-        if char in frequency:
-            frequency[char] += 1
-        else:
-            frequency[char] = 1
-    # reverse the dictionary to sort by frequency in accending order
-    frequency = dict(sorted(frequency.items(), key=lambda item: item[1]))
+    return dict(Counter(data))
 
-
-    #frequency = dict(sorted(frequency.items(), key=lambda item: item[1], reverse=True))
-
-    return frequency
 
 def read_file(filename):
-    # Reads the content of a file and returns it as a string.
     with open(filename, 'r') as file:
-        data = file.read()
-    return data
+        return file.read()
+
 
 def build_huffman_tree(frequency):
     heap = [Node(char, freq) for char, freq in frequency.items()]
@@ -48,48 +37,57 @@ def build_huffman_tree(frequency):
 
     return heap[0]  # Root of the tree
 
-# Generate Huffman Codes
+
 def generate_codes(root, current_code="", codes=None):
     if codes is None:
         codes = {}
-    if root is not None:
-        if root.char is not None:  # Leaf node
-            codes[root.char] = current_code
+    if root.char is not None:  # Single node or leaf
+        codes[root.char] = current_code if current_code else "0"  # Default code for single character
+    else:
         generate_codes(root.left, current_code + "0", codes)
         generate_codes(root.right, current_code + "1", codes)
     return codes
 
-# Compress the text
-def huffman_compress(text):
 
-    frequency = getFrequency(original_data)
+def write_binary_file(encoded_text, filename):
+    bits = bitarray(encoded_text)
+    bits.fill()  # Pads with zeros to complete a byte
+    padding_length = 8 - (len(encoded_text) % 8) if len(encoded_text) % 8 != 0 else 0
+    with open(filename, 'wb') as file:
+        # Write the padding length as the first byte
+        file.write(bytes([padding_length]))
+        bits.tofile(file)
+
+
+def save_huffman_codes(codes, filename):
+    with open(filename, 'w') as file:
+        json.dump(codes, file)
+
+
+def huffman_compress(text):
+    frequency = getFrequency(text)
 
     # Build Huffman Tree
     root = build_huffman_tree(frequency)
 
     # Generate codes
     codes = generate_codes(root)
-    with open("Codes.txt", "w") as file:
-        for char, freq in codes.items():
-            file.write(char + " " + str(freq) + "\n")
-    print("Generated Huffman Codes:", codes)
+
+    # Save codes to file
+    save_huffman_codes(codes, "Codes.json")
 
     # Encode the text
     encoded_text = "".join(codes[char] for char in text)
-    return encoded_text, root
 
-# Decompress the encoded text
+    # Write binary data
+    write_binary_file(encoded_text, "compressed.bin")
+
+    return root
 
 
-# Example Usage
 if __name__ == "__main__":
     original_data = read_file("input.txt")
 
     # Compression
-    encoded_text, huffman_tree = huffman_compress(original_data)
-    print("Encoded Text:", encoded_text)
-
-    with open("output.txt", "w") as file:
-        file.write(encoded_text)
-
-
+    huffman_tree = huffman_compress(original_data)
+    print("Compression completed!")

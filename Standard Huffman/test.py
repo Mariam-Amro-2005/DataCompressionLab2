@@ -1,6 +1,6 @@
 import heapq
 from collections import Counter
-from bitarray import bitarray
+from bitarray import bitarray 
 import json
 
 class Node:
@@ -63,6 +63,10 @@ def save_huffman_codes(codes, filename):
     with open(filename, 'w') as file:
         json.dump(codes, file)
 
+def write_file(filename, data):
+    # Writes data to a file.
+    with open(filename, 'w') as file:
+        file.write(data)
 
 def huffman_compress(text):
     frequency = getFrequency(text)
@@ -78,9 +82,12 @@ def huffman_compress(text):
 
     # Encode the text
     encoded_text = "".join(codes[char] for char in text)
-
+    
     # Write binary data
     write_binary_file(encoded_text, "compressed.bin")
+
+    # Write the original text after compression
+    write_file("Codes.txt", encoded_text)
 
     return root
 

@@ -1,7 +1,7 @@
 from collections import Counter
 import json
 import os
-
+import struct
 
 def read_file(filename):
     try:
@@ -42,6 +42,17 @@ def save_ranges_to_file(ranges, filename):
     with open(f"{filename}_ranges.json", "w", encoding="utf-8") as file:
         json.dump(ranges, file, indent=4)
     print(f"Ranges saved to {filename}_ranges.json")
+
+def save_compressed_value(filename, compressed_value):
+    # Save the compressed value to a binary file.
+    # Extract the base name without the extension
+    base_name, _ = os.path.splitext(filename)
+    binary_filename = f"{base_name}_compressed.bin"
+
+    with open(binary_filename, 'wb') as binary_file:
+        # Use struct to pack the float value into binary format
+        binary_file.write(struct.pack('d', compressed_value))
+    print(f"Compressed value saved to {binary_filename}")
 
 
 def arithmetic_compress(input_text, ranges):
@@ -94,6 +105,9 @@ def menu():
 
             # Perform arithmetic compression
             num_characters, compressed_value, original_ranges = arithmetic_compress(input_text, ranges)
+
+            # Save compressed value to binary file
+            save_compressed_value(filename, compressed_value)
 
             print("\nCompression Results:")
             print(f"File: {filename}")

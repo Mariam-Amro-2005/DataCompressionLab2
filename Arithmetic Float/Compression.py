@@ -39,9 +39,11 @@ def calculate_ranges(probabilities):
 
 
 def save_ranges_to_file(ranges, filename):
-    with open(f"{filename}_ranges.json", "w", encoding="utf-8") as file:
+    # Extract the base name without the extension
+    base_name, _ = os.path.splitext(filename)
+    with open(f"{base_name}_ranges.json", "w", encoding="utf-8") as file:
         json.dump(ranges, file, indent=4)
-    print(f"Ranges saved to {filename}_ranges.json")
+    print(f"Ranges saved to {base_name}_ranges.json")
 
 def save_compressed_value(filename, num_characters, compressed_value):
     # Save the compressed value to a binary file.

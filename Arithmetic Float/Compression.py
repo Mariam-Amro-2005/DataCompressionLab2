@@ -2,6 +2,10 @@ from collections import Counter
 import json
 import os
 import struct
+from decimal import Decimal, getcontext
+
+# Set precision for BigDecimal operations
+getcontext().prec = 500
 
 def read_file(filename):
     try:
@@ -22,13 +26,13 @@ def calculate_probabilities(file_content):
 
     frequency = dict(Counter(file_content))
     total_chars = sum(frequency.values())
-    probabilities = {char: freq / total_chars for char, freq in frequency.items()}
+    probabilities = {char: Decimal(freq) / Decimal(total_chars) for char, freq in frequency.items()}
     return dict(sorted(probabilities.items()))  # Sorted by characters
 
 
 def calculate_ranges(probabilities):
     ranges = {}
-    low = 0.0
+    low = Decimal(0)
 
     for char, prob in probabilities.items():
         high = low + prob
@@ -39,23 +43,20 @@ def calculate_ranges(probabilities):
 
 
 def save_ranges_to_file(ranges, filename):
-    # Extract the base name without the extension
     base_name, _ = os.path.splitext(filename)
+    ranges_str = {char: (str(low), str(high)) for char, (low, high) in ranges.items()}
     with open(f"{base_name}_ranges.json", "w", encoding="utf-8") as file:
-        json.dump(ranges, file, indent=4)
+        json.dump(ranges_str, file, indent=4)
     print(f"Ranges saved to {base_name}_ranges.json")
 
+
 def save_compressed_value(filename, num_characters, compressed_value):
-    # Save the compressed value to a binary file.
-    # Extract the base name without the extension
     base_name, _ = os.path.splitext(filename)
     binary_filename = f"{base_name}_compressed.bin"
 
     with open(binary_filename, 'wb') as binary_file:
-        # Write the number of characters (as an integer)
         binary_file.write(struct.pack('I', num_characters))  # 'I' for unsigned int
-        # Write the compressed value (as a float)
-        binary_file.write(struct.pack('d', compressed_value))  # 'd' for double
+        binary_file.write(str(compressed_value).encode('utf-8'))  # Save compressed value as string
     print(f"Compressed value and character count saved to {binary_filename}")
 
 
@@ -63,7 +64,7 @@ def arithmetic_compress(input_text, ranges):
     if not input_text or not ranges:
         return 0, None, {}
 
-    low, high = 0.0, 1.0
+    low, high = Decimal(0), Decimal(1)
 
     for char in input_text:
         if char not in ranges:
@@ -78,39 +79,74 @@ def arithmetic_compress(input_text, ranges):
     return len(input_text), compressed_value, ranges
 
 
+def load_ranges_from_file(filename):
+    base_name, _ = os.path.splitext(filename)
+    json_filename = f"{base_name}_ranges.json"
+    if not os.path.exists(json_filename):
+        print(f"Error: Ranges file '{json_filename}' does not exist.")
+        return None
+    with open(json_filename, "r", encoding="utf-8") as file:
+        ranges_str = json.load(file)
+        return {char: (Decimal(low), Decimal(high)) for char, (low, high) in ranges_str.items()}
+
+
+def read_compressed_file(filename):
+    base_name, _ = os.path.splitext(filename)
+    binary_filename = f"{base_name}_compressed.bin"
+    if not os.path.exists(binary_filename):
+        print(f"Error: Compressed file '{binary_filename}' does not exist.")
+        return None, None
+    with open(binary_filename, 'rb') as binary_file:
+        num_characters = struct.unpack('I', binary_file.read(4))[0]
+        compressed_value = Decimal(binary_file.read().decode('utf-8'))
+    return num_characters, compressed_value
+
+
+def arithmetic_decompress(num_characters, compressed_value, ranges):
+    if num_characters is None or compressed_value is None or not ranges:
+        print("Error: Missing data for decompression.")
+        return ""
+
+    decoded_text = []
+
+    for _ in range(num_characters):
+        for char, (low, high) in ranges.items():
+            if low <= compressed_value < high:
+                decoded_text.append(char)
+                range_width = high - low
+                compressed_value = (compressed_value - low) / range_width
+                break
+
+    return ''.join(decoded_text)
+
+
 def menu():
     print("Arithmetic Compression Tool")
     print("===========================")
     while True:
         print("\nOptions:")
         print("1. Compress a file")
-        print("2. Exit")
+        print("2. Decompress a file")
+        print("3. Exit")
 
-        choice = input("Enter your choice (1/2): ").strip()
+        choice = input("Enter your choice (1/2/3): ").strip()
 
         if choice == "1":
-            filename = input("Enter the file name to compress: ").strip()
+            filename = "input.txt"
             if not os.path.exists(filename):
                 print(f"Error: File '{filename}' does not exist.")
                 continue
 
-            # Read the file content
             input_text = read_file(filename)
             if not input_text:
                 print(f"Error: File '{filename}' is empty or unreadable.")
                 continue
 
-            # Calculate probabilities and ranges
             probabilities = calculate_probabilities(input_text)
             ranges = calculate_ranges(probabilities)
-
-            # Save ranges to a JSON file
             save_ranges_to_file(ranges, filename)
 
-            # Perform arithmetic compression
             num_characters, compressed_value, original_ranges = arithmetic_compress(input_text, ranges)
-
-            # Save compressed value to binary file
             save_compressed_value(filename, num_characters, compressed_value)
 
             print("\nCompression Results:")
@@ -118,11 +154,26 @@ def menu():
             print(f"Number of Characters: {num_characters}")
             print(f"Compressed Value: {compressed_value}")
             print(f"Ranges saved to {filename}_ranges.json")
-
         elif choice == "2":
+            filename = "input"
+            num_characters, compressed_value = read_compressed_file(filename)
+            if num_characters is None or compressed_value is None:
+                continue
+
+            ranges = load_ranges_from_file(filename)
+            if ranges is None:
+                continue
+
+            original_text = arithmetic_decompress(num_characters, compressed_value, ranges)
+
+            base_name, _ = os.path.splitext(filename)
+            decompressed_filename = f"{base_name}_decompressed.txt"
+            with open(decompressed_filename, "w", encoding="utf-8") as file:
+                file.write(original_text)
+            print(f"Decompressed text saved to {decompressed_filename}")
+        elif choice == "3":
             print("Exiting the tool. Goodbye!")
             break
-
         else:
             print("Invalid choice. Please select 1 or 2.")
 

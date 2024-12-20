@@ -1,0 +1,62 @@
+from PIL import Image
+import numpy as np
+
+
+
+def image_to_square_matrix(image_path):
+
+    # Open the image file
+    img = Image.open(image_path)
+
+    # Convert the image to grayscale
+    img = img.convert('L')
+
+    # Convert the image to a numpy array
+    matrix = np.array(img)
+
+    # Get the current dimensions of the matrix
+    rows, cols = matrix.shape
+
+    # Determine the size of the square matrix
+    max_size = max(rows, cols)
+
+    # Create a new square matrix with the larger dimension
+    square_matrix = np.zeros((max_size, max_size), dtype=matrix.dtype)
+
+    # Copy the original matrix into the square matrix
+    square_matrix[:rows, :cols] = matrix
+
+    # Add padding by extending the last row and column
+    if rows < max_size:
+        square_matrix[rows:, :] = square_matrix[rows - 1:rows, :]
+    if cols < max_size:
+        square_matrix[:, cols:] = square_matrix[:, cols - 1:cols]
+
+    return square_matrix , matrix.shape
+
+
+
+
+def matrix_to_image(matrix, output_path, rows, cols):
+    
+    trimmed_matrix = matrix[:rows, :cols]
+
+    # Convert the numpy array to a Pillow Image
+    img = Image.fromarray(trimmed_matrix.astype(np.uint8), mode='L')
+
+    # Save the image to the specified path
+    img.save(output_path)
+
+    print(f"Image saved to {output_path}")
+
+
+
+
+if __name__ == "__main__":
+    # Example usage
+    image_path = "im.jpg"  # Replace with the path to your image
+
+    square_matrix, original_size = image_to_square_matrix(image_path)
+
+    output_file = "compressed_data.txt"
+
